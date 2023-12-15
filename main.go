@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -14,18 +15,19 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		targetFolder, _ := cmd.Flags().GetString("folder")
 		outputFile, _ := cmd.Flags().GetString("output")
+		regexPattern, _ := cmd.Flags().GetString("regex")
 
-		files := listFiles(targetFolder)
+		files := listFiles(targetFolder, regexPattern)
 
 		if outputFile != "" {
-			saveToFile(outputFile, files)
+			saveToFile(outputFile, files, regexPattern)
 		} else {
 			printFiles(files)
 		}
 	},
 }
 
-func listFiles(folder string) []string {
+func listFiles(folder string, regexPattern string) []string {
 	files, err := os.ReadDir(folder)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -33,8 +35,11 @@ func listFiles(folder string) []string {
 	}
 
 	var fileNames []string
+	regex := regexp.MustCompile(regexPattern)
 	for _, file := range files {
-		fileNames = append(fileNames, file.Name())
+		if regex.MatchString(file.Name()) {
+			fileNames = append(fileNames, file.Name())
+		}
 	}
 	return fileNames
 }
@@ -45,7 +50,7 @@ func printFiles(files []string) {
 	}
 }
 
-func saveToFile(outputFile string, files []string) {
+func saveToFile(outputFile string, files []string, regexPattern string) {
 	targetFile, err := os.Create(outputFile)
 	if err != nil {
 		fmt.Println("Error creating file:", err)
@@ -53,8 +58,11 @@ func saveToFile(outputFile string, files []string) {
 	}
 	defer targetFile.Close()
 
+	regex := regexp.MustCompile(regexPattern)
 	for _, file := range files {
-		fmt.Fprintln(targetFile, file)
+		if regex.MatchString(file) {
+			fmt.Fprintln(targetFile, file)
+		}
 	}
 
 	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "::", "Result saved to", outputFile)
@@ -63,6 +71,7 @@ func saveToFile(outputFile string, files []string) {
 func init() {
 	rootCmd.Flags().StringP("folder", "f", ".", "Target folder path")
 	rootCmd.Flags().StringP("output", "o", "", "Output file path")
+	rootCmd.Flags().StringP("regex", "r", "", "Pattern of file name")
 }
 
 func main() {
