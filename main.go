@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -16,62 +17,58 @@ var rootCmd = &cobra.Command{
 		targetFolder, _ := cmd.Flags().GetString("folder")
 		outputFile, _ := cmd.Flags().GetString("output")
 		regexPattern, _ := cmd.Flags().GetString("regex")
+		isSplit, _ := cmd.Flags().GetBool("split")
+		splitPosition, _ := cmd.Flags().GetInt("position")
 
-		files := listFiles(targetFolder, regexPattern)
-
-		if outputFile != "" {
-			saveToFile(outputFile, files, regexPattern)
-		} else {
-			printFiles(files)
-		}
+		listFiles(targetFolder, regexPattern, isSplit, splitPosition, outputFile)
 	},
 }
 
-func listFiles(folder string, regexPattern string) []string {
+func listFiles(folder string, regexPattern string, isSplit bool, splitPosition int, outputFile string) {
 	files, err := os.ReadDir(folder)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return nil
 	}
 
 	var fileNames []string
 	regex := regexp.MustCompile(regexPattern)
 	for _, file := range files {
-		if regex.MatchString(file.Name()) {
-			fileNames = append(fileNames, file.Name())
+		targetFileName := file.Name()
+		fileName := targetFileName
+		if regex.MatchString(targetFileName) {
+			if isSplit {
+				splitedText := strings.Split(targetFileName, " ")
+
+				targetSplitPosition := splitPosition
+				if splitPosition >= len(splitedText) {
+					targetSplitPosition = len(splitedText) - 1
+				}
+				fileName = splitedText[targetSplitPosition]
+			}
+
+			fileNames = append(fileNames, fileName)
 		}
 	}
-	return fileNames
-}
-
-func printFiles(files []string) {
-	for _, file := range files {
-		fmt.Println(file)
-	}
-}
-
-func saveToFile(outputFile string, files []string, regexPattern string) {
-	targetFile, err := os.Create(outputFile)
-	if err != nil {
-		fmt.Println("Error creating file:", err)
-		return
-	}
-	defer targetFile.Close()
-
-	regex := regexp.MustCompile(regexPattern)
-	for _, file := range files {
-		if regex.MatchString(file) {
-			fmt.Fprintln(targetFile, file)
+	if outputFile != "" {
+		targetFile, err := os.Create(outputFile)
+		if err != nil {
+			fmt.Println("Error creating file:", err)
 		}
+		defer targetFile.Close()
+		for _, fileName := range fileNames {
+			fmt.Fprintln(targetFile, fileName)
+		}
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "::", "Result saved to", outputFile)
 	}
 
-	fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "::", "Result saved to", outputFile)
 }
 
 func init() {
 	rootCmd.Flags().StringP("folder", "f", ".", "Target folder path")
 	rootCmd.Flags().StringP("output", "o", "", "Output file path")
 	rootCmd.Flags().StringP("regex", "r", "", "Pattern of file name")
+	rootCmd.Flags().BoolP("split", "s", false, "Is split base on regex")
+	rootCmd.Flags().IntP("position", "p", 0, "Position to be splited")
 }
 
 func main() {
